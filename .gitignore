@@ -1,0 +1,33 @@
+# --- Secrets / environment ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# --- Node / React ---
+node_modules/
+dashboard/build/
+
+# --- Sensitive runtime data (never commit real student data) ---
+attendance-server/faces/*
+!attendance-server/faces/.gitkeep
+attendance-server/logs/*
+!attendance-server/logs/.gitkeep
+backups/*
+!backups/.gitkeep
+*.db
+*.sqlite3
+*.sql
+*.dump
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
