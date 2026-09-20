@@ -1,10 +1,13 @@
+import asyncio
+import logging
+
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.database.database import Base, engine
+from app.database.database import Base, engine, SessionLocal
 from app.models.student import Student
 from app.models.attendance import Attendance
 from app.models.device import Device
@@ -18,6 +21,7 @@ from app.api.tutor_courses import router as tutor_courses_router
 from app.api.attendance import router as attendance_router
 from app.api.student import router as student_router
 from app.api.session import router as session_router
+from app.api.session import close_expired_sessions
 from app.api.dashboard import router as dashboard_router
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
@@ -55,6 +59,43 @@ app.include_router(courses_router)
 app.include_router(student_courses_router)
 app.include_router(tutor_courses_router)
 app.include_router(reports_router)
+
+# ===========================
+# Auto-close expired sessions
+# ===========================
+
+SESSION_CHECK_INTERVAL_SECONDS = 30
+
+logger = logging.getLogger("uvicorn.error")
+
+
+def _close_expired_sessions_sync():
+    db = SessionLocal()
+    try:
+        closed = close_expired_sessions(db)
+        for session in closed:
+            logger.info(
+                "Auto-closed session %s (scheduled_end=%s)",
+                session.id,
+                session.scheduled_end,
+            )
+    finally:
+        db.close()
+
+
+async def _session_auto_close_loop():
+    while True:
+        try:
+            await asyncio.to_thread(_close_expired_sessions_sync)
+        except Exception:
+            logger.exception("Failed to auto-close expired sessions")
+        await asyncio.sleep(SESSION_CHECK_INTERVAL_SECONDS)
+
+
+@app.on_event("startup")
+async def start_session_auto_close_task():
+    asyncio.create_task(_session_auto_close_loop())
+
 
 # ===========================
 # React Dashboard

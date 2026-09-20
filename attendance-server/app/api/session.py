@@ -212,6 +212,49 @@ def start_session(
 
     return session
 
+def _finish_session(db: Session, session: ClassSession):
+    """Mark a session finished and check out any still-active attendance."""
+
+    session.status = "FINISHED"
+    session.actual_end = datetime.now()
+
+    active_attendance = (
+        db.query(Attendance)
+        .filter(
+            Attendance.session_id == session.id,
+            Attendance.status == "ACTIVE"
+        )
+        .all()
+    )
+
+    for record in active_attendance:
+        record.status = "CHECKED_OUT"
+        record.time_out = datetime.utcnow()
+
+    db.commit()
+    db.refresh(session)
+
+    return session
+
+
+def close_expired_sessions(db: Session):
+    """Auto-finish any RUNNING session whose scheduled end time has passed."""
+
+    expired_sessions = (
+        db.query(ClassSession)
+        .filter(
+            ClassSession.status == "RUNNING",
+            ClassSession.scheduled_end <= datetime.now()
+        )
+        .all()
+    )
+
+    for session in expired_sessions:
+        _finish_session(db, session)
+
+    return expired_sessions
+
+
 @router.put("/{session_id}/finish")
 def finish_session(
     session_id: int,
@@ -228,22 +271,4 @@ def finish_session(
             detail="Session not found."
         )
 
-    session.status = "FINISHED"
-    session.actual_end = datetime.now()
-    active_attendance = (
-        db.query(Attendance)
-        .filter(
-            Attendance.session_id == session.id,
-            Attendance.status == "ACTIVE"
-        )
-        .all()
-    )
-
-    for record in active_attendance:
-        record.status = "CHECKED_OUT"
-        record.time_out = datetime.utcnow()
-    db.commit()
-    db.refresh(session)
-
-
-    return session
+    return _finish_session(db, session)

@@ -147,6 +147,7 @@ def _bulk_report_rows(course_ids, since, db: Session):
             attendance = attendance_lookup.get(student.student_id)
 
             rows.append({
+                "session_id": session.id,
                 "session_date": session.scheduled_start.strftime("%Y-%m-%d"),
                 "course_code": course.course_code if course else "",
                 "student_id": student.student_id,
@@ -160,7 +161,7 @@ def _bulk_report_rows(course_ids, since, db: Session):
     return rows
 
 
-def _download_bulk_report(current_user: User, db: Session, days: int, label: str):
+def _download_bulk_report(current_user: User, db: Session, since: datetime, label: str, not_found_detail: str):
 
     if current_user.role not in ("ADMIN", "TUTOR"):
         raise HTTPException(
@@ -169,20 +170,19 @@ def _download_bulk_report(current_user: User, db: Session, days: int, label: str
         )
 
     course_ids = _scoped_course_ids(current_user, db)
-    since = datetime.utcnow() - timedelta(days=days)
     rows = _bulk_report_rows(course_ids, since, db)
 
     if not rows:
         raise HTTPException(
             status_code=404,
-            detail=f"No finished sessions in the last {days} days"
+            detail=not_found_detail
         )
 
     buffer = io.StringIO()
     writer = csv.DictWriter(
         buffer,
         fieldnames=[
-            "session_date", "course_code", "student_id",
+            "session_id", "session_date", "course_code", "student_id",
             "name", "status", "time_in", "time_out", "method"
         ]
     )
@@ -283,7 +283,15 @@ def download_weekly_report(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    return _download_bulk_report(current_user, db, days=7, label="Weekly")
+    # Start of the current week (Monday 00:00 UTC) — excludes prior weeks,
+    # unlike a rolling "last 7 days" window which can bleed into last week.
+    today = datetime.utcnow().date()
+    start_of_week = datetime.combine(today - timedelta(days=today.weekday()), datetime.min.time())
+
+    return _download_bulk_report(
+        current_user, db, since=start_of_week, label="Weekly",
+        not_found_detail="No finished sessions this week"
+    )
 
 
 @router.get("/download/fortnightly")
@@ -291,7 +299,11 @@ def download_fortnightly_report(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    return _download_bulk_report(current_user, db, days=14, label="Fortnightly")
+    since = datetime.utcnow() - timedelta(days=14)
+    return _download_bulk_report(
+        current_user, db, since=since, label="Fortnightly",
+        not_found_detail="No finished sessions in the last 14 days"
+    )
 
 
 @router.get("/download/{session_id}")

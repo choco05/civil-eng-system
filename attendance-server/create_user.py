@@ -19,7 +19,7 @@ def create_user(username, password, full_name, email, role):
         username=username,
         password_hash=hash_password(password),
         full_name=full_name,
-        email=email,
+        email=email.strip().lower(),
         role=role,
         active=True
     )

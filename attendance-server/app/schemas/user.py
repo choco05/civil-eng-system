@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 
 
@@ -10,6 +10,11 @@ class UserCreate(BaseModel):
     email: EmailStr
     role: str
 
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
 
 class UserUpdate(BaseModel):
 
@@ -17,6 +22,11 @@ class UserUpdate(BaseModel):
     email: EmailStr
     role: str
     password: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
 
 
 class UserResponse(BaseModel):

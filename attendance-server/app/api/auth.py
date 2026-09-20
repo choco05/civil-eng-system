@@ -10,7 +10,7 @@ from app.database.database import SessionLocal
 from app.models.user import User
 from app.security import verify_password, hash_password, create_access_token
 from app.services.email_service import send_password_reset_email
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 RESET_TOKEN_EXPIRE_MINUTES = 30
 
@@ -95,6 +95,11 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
 
 
 class ResetPasswordRequest(BaseModel):

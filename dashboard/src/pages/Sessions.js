@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
 
+const DEFAULT_CAMERA_ID = "CAMERA-01";
+
 function Sessions() {
 
     const [sessions, setSessions] = useState([]);
@@ -9,7 +11,7 @@ function Sessions() {
     const [form, setForm] = useState({
         course_id: "",
         room: "",
-        device_id: "",
+        device_id: DEFAULT_CAMERA_ID,
         scheduled_start: "",
         scheduled_end: "",
         verification_interval: 30
@@ -91,14 +93,23 @@ function Sessions() {
 
     try {
 
-        await api.post("/sessions/", form);
+        // Only admins can choose a camera; tutors always use the default
+        const deviceId =
+            role === "ADMIN"
+                ? form.device_id.trim() || DEFAULT_CAMERA_ID
+                : DEFAULT_CAMERA_ID;
+
+        await api.post("/sessions/", {
+            ...form,
+            device_id: deviceId
+        });
 
         loadSessions();
 
         setForm({
             course_id: "",
             room: "",
-            device_id: "",
+            device_id: DEFAULT_CAMERA_ID,
             scheduled_start: "",
             scheduled_end: "",
             verification_interval: 30
@@ -213,6 +224,7 @@ function Sessions() {
             />
             </div>
 
+            {role === "ADMIN" && (
             <div>
             <label>Camera</label><br/>
             <input
@@ -221,6 +233,7 @@ function Sessions() {
             style={{width:"100%"}}
             />
             </div>
+            )}
 
             <div>
             <label>Scheduled Start</label><br/>
